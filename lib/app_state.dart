@@ -70,6 +70,7 @@ class AppState extends ChangeNotifier {
   late final SyncEngine _syncEngine;
   final List<PairRequest> _pendingPairRequests = <PairRequest>[];
   final List<PendingPairOutgoing> _pendingOutgoing = <PendingPairOutgoing>[];
+  String? _localPublicKey;
 
   bool _isSyncEnabled = true;
   bool _isBackgroundSyncEnabled = false;
@@ -78,10 +79,12 @@ class AppState extends ChangeNotifier {
   bool get isBackgroundSyncEnabled => _isBackgroundSyncEnabled;
   List<PairRequest> get pendingPairRequests => List.unmodifiable(_pendingPairRequests);
   int get maxBinaryBytes => SyncEngine.maxBinaryBytes;
+  String get localPublicKey => _localPublicKey ?? '';
 
   Future<void> initialize() async {
     await storageService.init();
     await identityService.init();
+    _localPublicKey = identityService.publicKeyBase64;
     await historyStore.loadFromStorage();
     await pairingManager.loadFromStorage();
     await offlineQueue.loadFromStorage();
@@ -159,6 +162,12 @@ class AppState extends ChangeNotifier {
 
   void removePairedDevice(String id) {
     pairingManager.removeDevice(id);
+  }
+
+  Future<void> rotateKeys() async {
+    await identityService.rotateKeys();
+    _localPublicKey = identityService.publicKeyBase64;
+    notifyListeners();
   }
 
   void clearHistory() {

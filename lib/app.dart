@@ -101,6 +101,8 @@ class HomeScreen extends StatelessWidget {
                 state.toggleBackgroundSync(true);
               } else if (value == 'background_off') {
                 state.toggleBackgroundSync(false);
+              } else if (value == 'rotate_keys') {
+                _confirmRotateKeys(context, state);
               }
             },
             itemBuilder: (context) => const [
@@ -119,6 +121,10 @@ class HomeScreen extends StatelessWidget {
               PopupMenuItem(
                 value: 'background_off',
                 child: Text('Disable background sync'),
+              ),
+              PopupMenuItem(
+                value: 'rotate_keys',
+                child: Text('Rotate identity keys'),
               ),
             ],
           ),
@@ -167,6 +173,7 @@ class HomeScreen extends StatelessWidget {
             ...devices.map((d) => _DeviceTile(
                   device: d,
                   onRemove: () => state.removePairedDevice(d.id),
+                  onVerify: () => _showVerifyDialog(context, state, d),
                 )),
           const SizedBox(height: 24),
           const _SectionTitle(title: 'Clipboard History'),
@@ -204,6 +211,66 @@ class HomeScreen extends StatelessWidget {
     if (result == true) {
       state.clearAllStorage();
     }
+  }
+
+  Future<void> _confirmRotateKeys(BuildContext context, AppState state) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Rotate Identity Keys'),
+          content: const Text(
+            'This will generate a new device keypair. Existing paired devices '
+            'will need to be re-paired to trust the new key. Continue?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Rotate'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result == true) {
+      await state.rotateKeys();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Keys rotated. Re-pair devices.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _showVerifyDialog(
+    BuildContext context,
+    AppState state,
+    PairedDevice device,
+  ) async {
+    final fingerprint = _fingerprintForKey(device.publicKey);
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Verify Device'),
+          content: SelectableText(
+            'Compare this fingerprint on both devices:\n\n$fingerprint\n\n'
+            'Local device key:\n${state.localPublicKey}',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Done'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _showPairDialog(BuildContext context) async {
@@ -361,10 +428,15 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _DeviceTile extends StatelessWidget {
-  const _DeviceTile({required this.device, required this.onRemove});
+  const _DeviceTile({
+    required this.device,
+    required this.onRemove,
+    required this.onVerify,
+  });
 
   final PairedDevice device;
   final VoidCallback onRemove;
+  final VoidCallback onVerify;
 
   @override
   Widget build(BuildContext context) {
@@ -378,6 +450,10 @@ class _DeviceTile extends StatelessWidget {
           Icon(device.isOnline ? Icons.circle : Icons.circle_outlined,
               color: device.isOnline ? Colors.green : Colors.grey, size: 12),
           const SizedBox(width: 12),
+          IconButton(
+            onPressed: onVerify,
+            icon: const Icon(Icons.verified_user),
+          ),
           IconButton(
             onPressed: onRemove,
             icon: const Icon(Icons.close),
@@ -435,6 +511,18 @@ String _formatBytes(int bytes) {
     return '${(bytes / 1024).toStringAsFixed(1)} KB';
   }
   return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+}
+
+String _fingerprintForKey(String? key) {
+  if (key == null || key.isEmpty) {
+    return 'Unavailable';
+  }
+  final normalized = key.replaceAll('=', '');
+  final groups = <String>[];
+  for (var i = 0; i < normalized.length; i += 4) {
+    groups.add(normalized.substring(i, i + 4 > normalized.length ? normalized.length : i + 4));
+  }
+  return groups.join(' ');
 }
 
 String? _mimeFromExtension(String? extension) {

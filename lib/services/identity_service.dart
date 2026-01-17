@@ -31,6 +31,16 @@ class IdentityService {
     });
   }
 
+  Future<void> rotateKeys() async {
+    _keyPair = await _keyType.newKeyPair();
+    final publicKey = await _keyPair!.extractPublicKey();
+    _publicKey = publicKey;
+    await _storageService.persistIdentity({
+      'privateKey': base64Encode(await _keyPair!.extractPrivateKeyBytes()),
+      'publicKey': base64Encode(publicKey.bytes),
+    });
+  }
+
   String get publicKeyBase64 => base64Encode(_publicKey!.bytes);
 
   Future<String> deriveSharedSecretBase64(String remotePublicKeyBase64) async {
