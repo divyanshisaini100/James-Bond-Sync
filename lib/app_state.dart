@@ -7,6 +7,7 @@ import 'models/clipboard_item.dart';
 import 'models/paired_device.dart';
 import 'models/pair_request.dart';
 import 'models/pending_pair_outgoing.dart';
+import 'services/background_sync_service.dart';
 import 'services/clipboard_service.dart';
 import 'services/history_store.dart';
 import 'services/offline_queue.dart';
@@ -25,6 +26,7 @@ class AppState extends ChangeNotifier {
     historyStore = HistoryStore(storageService: storageService);
     pairingManager = PairingManager(storageService: storageService);
     offlineQueue = OfflineQueue(storageService: storageService);
+    backgroundSyncService = BackgroundSyncService();
     signalingClient = WebSocketSignalingClient(
       url: _signalingUrl,
       deviceId: _deviceId,
@@ -61,6 +63,7 @@ class AppState extends ChangeNotifier {
   late final HistoryStore historyStore;
   late final PairingManager pairingManager;
   final ClipboardService clipboardService;
+  late final BackgroundSyncService backgroundSyncService;
   late final OfflineQueue offlineQueue;
   late final P2PClient p2pClient;
   late final SignalingClient signalingClient;
@@ -69,8 +72,10 @@ class AppState extends ChangeNotifier {
   final List<PendingPairOutgoing> _pendingOutgoing = <PendingPairOutgoing>[];
 
   bool _isSyncEnabled = true;
+  bool _isBackgroundSyncEnabled = false;
 
   bool get isSyncEnabled => _isSyncEnabled;
+  bool get isBackgroundSyncEnabled => _isBackgroundSyncEnabled;
   List<PairRequest> get pendingPairRequests => List.unmodifiable(_pendingPairRequests);
   int get maxBinaryBytes => SyncEngine.maxBinaryBytes;
 
@@ -100,6 +105,16 @@ class AppState extends ChangeNotifier {
     } else {
       _syncEngine.stop();
     }
+  }
+
+  Future<void> toggleBackgroundSync(bool enabled) async {
+    _isBackgroundSyncEnabled = enabled;
+    if (enabled) {
+      await backgroundSyncService.enable();
+    } else {
+      await backgroundSyncService.disable();
+    }
+    notifyListeners();
   }
 
   Future<String> addPairedDevice(String id, String name) async {

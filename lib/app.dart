@@ -86,6 +86,10 @@ class HomeScreen extends StatelessWidget {
                 state.clearHistory();
               } else if (value == 'reset_storage') {
                 _confirmReset(context, state);
+              } else if (value == 'background_on') {
+                state.toggleBackgroundSync(true);
+              } else if (value == 'background_off') {
+                state.toggleBackgroundSync(false);
               }
             },
             itemBuilder: (context) => const [
@@ -96,6 +100,14 @@ class HomeScreen extends StatelessWidget {
               PopupMenuItem(
                 value: 'reset_storage',
                 child: Text('Forget devices & reset'),
+              ),
+              PopupMenuItem(
+                value: 'background_on',
+                child: Text('Enable background sync'),
+              ),
+              PopupMenuItem(
+                value: 'background_off',
+                child: Text('Disable background sync'),
               ),
             ],
           ),
