@@ -61,6 +61,7 @@ class HomeScreen extends StatelessWidget {
     final state = AppScope.of(context);
     final devices = state.pairingManager.devices;
     final history = state.historyStore.items;
+    final pending = state.pendingPairRequests;
 
     return Scaffold(
       appBar: AppBar(
@@ -87,6 +88,17 @@ class HomeScreen extends StatelessWidget {
               child: const Text('Add'),
             ),
           ),
+          if (pending.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const _SectionTitle(title: 'Pair Requests'),
+            ...pending.map((request) => _PairRequestTile(
+                  deviceName: request.deviceName,
+                  deviceId: request.deviceId,
+                  onApprove: () => state.approvePairRequest(request),
+                  onReject: () => state.rejectPairRequest(request.deviceId),
+                )),
+            const SizedBox(height: 16),
+          ],
           if (devices.isEmpty)
             const Text('No devices paired yet.')
           else
@@ -214,6 +226,43 @@ class _HistoryTile extends StatelessWidget {
         title: Text(preview),
         subtitle: Text('From ${item.deviceId}'),
         onTap: () => state.clipboardService.setClipboardText(item.text, suppressNextRead: true),
+      ),
+    );
+  }
+}
+
+class _PairRequestTile extends StatelessWidget {
+  const _PairRequestTile({
+    required this.deviceName,
+    required this.deviceId,
+    required this.onApprove,
+    required this.onReject,
+  });
+
+  final String deviceName;
+  final String deviceId;
+  final VoidCallback onApprove;
+  final VoidCallback onReject;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        title: Text(deviceName),
+        subtitle: Text(deviceId),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              onPressed: onApprove,
+              icon: const Icon(Icons.check),
+            ),
+            IconButton(
+              onPressed: onReject,
+              icon: const Icon(Icons.close),
+            ),
+          ],
+        ),
       ),
     );
   }

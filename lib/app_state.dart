@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import 'models/paired_device.dart';
+import 'models/pair_request.dart';
 import 'services/clipboard_service.dart';
 import 'services/history_store.dart';
 import 'services/offline_queue.dart';
@@ -17,7 +18,7 @@ class AppState extends ChangeNotifier {
         clipboardService = ClipboardService(),
         offlineQueue = OfflineQueue() {
     signalingClient = WebSocketSignalingClient(
-      url: 'ws://localhost:8080',
+      url: _signalingUrl,
       deviceId: _deviceId,
       deviceName: 'Clipboard Device',
     );
@@ -40,6 +41,8 @@ class AppState extends ChangeNotifier {
   }
 
   static final String _deviceId = 'device-${DateTime.now().millisecondsSinceEpoch}';
+  static const String _signalingUrl =
+      String.fromEnvironment('SIGNALING_URL', defaultValue: 'ws://localhost:8080');
   final String localDeviceId = _deviceId;
   final HistoryStore historyStore;
   final PairingManager pairingManager;
@@ -48,10 +51,12 @@ class AppState extends ChangeNotifier {
   late final P2PClient p2pClient;
   late final SignalingClient signalingClient;
   late final SyncEngine _syncEngine;
+  final List<PairRequest> _pendingPairRequests = <PairRequest>[];
 
   bool _isSyncEnabled = true;
 
   bool get isSyncEnabled => _isSyncEnabled;
+  List<PairRequest> get pendingPairRequests => List.unmodifiable(_pendingPairRequests);
 
   Future<void> start() async {
     if (_isSyncEnabled) {
@@ -81,13 +86,29 @@ class AppState extends ChangeNotifier {
     pairingManager.removeDevice(id);
   }
 
+  void approvePairRequest(PairRequest request) {
+    _pendingPairRequests.removeWhere((r) => r.deviceId == request.deviceId);
+    pairingManager.addDevice(PairedDevice(id: request.deviceId, name: request.deviceName));
+    signalingClient.acceptPair(request.deviceId);
+    if (p2pClient is WebRtcP2PClient) {
+      (p2pClient as WebRtcP2PClient).connectToDevice(request.deviceId);
+    }
+    notifyListeners();
+  }
+
+  void rejectPairRequest(String deviceId) {
+    _pendingPairRequests.removeWhere((r) => r.deviceId == deviceId);
+    notifyListeners();
+  }
+
   void _wireSignalingHandlers() {
     final rtcClient = p2pClient is WebRtcP2PClient ? p2pClient as WebRtcP2PClient : null;
     signalingClient.setOnPairRequest((fromDeviceId, fromDeviceName) {
-      // TODO: Replace with user-approved pairing dialog.
-      pairingManager.addDevice(PairedDevice(id: fromDeviceId, name: fromDeviceName));
-      signalingClient.acceptPair(fromDeviceId);
-      rtcClient?.connectToDevice(fromDeviceId);
+      if (_pendingPairRequests.any((r) => r.deviceId == fromDeviceId)) {
+        return;
+      }
+      _pendingPairRequests.add(PairRequest(deviceId: fromDeviceId, deviceName: fromDeviceName));
+      notifyListeners();
     });
     signalingClient.setOnPairAccept((fromDeviceId) {
       if (pairingManager.devices.any((d) => d.id == fromDeviceId)) {
