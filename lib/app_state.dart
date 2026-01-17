@@ -7,16 +7,17 @@ import 'services/history_store.dart';
 import 'services/offline_queue.dart';
 import 'services/pairing_manager.dart';
 import 'services/p2p_client.dart';
+import 'services/storage_service.dart';
 import 'services/webrtc_p2p_client.dart';
 import 'services/signaling_client.dart';
 import 'services/sync_engine.dart';
 
 class AppState extends ChangeNotifier {
-  AppState()
-      : historyStore = HistoryStore(),
-        pairingManager = PairingManager(),
-        clipboardService = ClipboardService(),
-        offlineQueue = OfflineQueue() {
+  AppState() : clipboardService = ClipboardService() {
+    storageService = StorageService();
+    historyStore = HistoryStore(storageService: storageService);
+    pairingManager = PairingManager(storageService: storageService);
+    offlineQueue = OfflineQueue(storageService: storageService);
     signalingClient = WebSocketSignalingClient(
       url: _signalingUrl,
       deviceId: _deviceId,
@@ -48,10 +49,11 @@ class AppState extends ChangeNotifier {
   static const String _turnUsername = String.fromEnvironment('TURN_USERNAME');
   static const String _turnCredential = String.fromEnvironment('TURN_CREDENTIAL');
   final String localDeviceId = _deviceId;
-  final HistoryStore historyStore;
-  final PairingManager pairingManager;
+  late final StorageService storageService;
+  late final HistoryStore historyStore;
+  late final PairingManager pairingManager;
   final ClipboardService clipboardService;
-  final OfflineQueue offlineQueue;
+  late final OfflineQueue offlineQueue;
   late final P2PClient p2pClient;
   late final SignalingClient signalingClient;
   late final SyncEngine _syncEngine;
@@ -61,6 +63,13 @@ class AppState extends ChangeNotifier {
 
   bool get isSyncEnabled => _isSyncEnabled;
   List<PairRequest> get pendingPairRequests => List.unmodifiable(_pendingPairRequests);
+
+  Future<void> initialize() async {
+    await storageService.init();
+    await historyStore.loadFromStorage();
+    await pairingManager.loadFromStorage();
+    await offlineQueue.loadFromStorage();
+  }
 
   Future<void> start() async {
     if (_isSyncEnabled) {

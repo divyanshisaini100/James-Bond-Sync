@@ -18,7 +18,7 @@ class _AppRootState extends State<AppRoot> {
   void initState() {
     super.initState();
     _appState = AppState();
-    _appState.start();
+    _appState.initialize().then((_) => _appState.start());
   }
 
   @override
