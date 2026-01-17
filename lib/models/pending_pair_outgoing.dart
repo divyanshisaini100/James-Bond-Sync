@@ -1,13 +1,11 @@
-class PairRequest {
-  PairRequest({
+class PendingPairOutgoing {
+  PendingPairOutgoing({
     required this.deviceId,
     required this.deviceName,
-    required this.publicKey,
     required this.codeHash,
   });
 
   final String deviceId;
   final String deviceName;
-  final String publicKey;
   final String codeHash;
 }

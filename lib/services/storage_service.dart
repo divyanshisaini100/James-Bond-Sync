@@ -7,6 +7,7 @@ class StorageService {
   static const String _historyBox = 'clipboard_history';
   static const String _pairedDevicesBox = 'paired_devices';
   static const String _offlineQueueBox = 'offline_queue';
+  static const String _identityBox = 'identity';
 
   bool _initialized = false;
 
@@ -18,6 +19,7 @@ class StorageService {
     await Hive.openBox<Map>(_historyBox);
     await Hive.openBox<Map>(_pairedDevicesBox);
     await Hive.openBox<Map>(_offlineQueueBox);
+    await Hive.openBox<Map>(_identityBox);
     _initialized = true;
   }
 
@@ -49,6 +51,8 @@ class StorageService {
             id: json['id'] as String,
             name: json['name'] as String,
             isOnline: false,
+            publicKey: json['publicKey'] as String?,
+            sharedSecret: json['sharedSecret'] as String?,
           );
         })
         .toList();
@@ -56,7 +60,12 @@ class StorageService {
 
   Future<void> persistPairedDevice(PairedDevice device) async {
     final box = Hive.box<Map>(_pairedDevicesBox);
-    await box.put(device.id, {'id': device.id, 'name': device.name});
+    await box.put(device.id, {
+      'id': device.id,
+      'name': device.name,
+      'publicKey': device.publicKey,
+      'sharedSecret': device.sharedSecret,
+    });
   }
 
   Future<void> removePairedDevice(String deviceId) async {
@@ -93,5 +102,20 @@ class StorageService {
     await Hive.box<Map>(_historyBox).clear();
     await Hive.box<Map>(_pairedDevicesBox).clear();
     await Hive.box<Map>(_offlineQueueBox).clear();
+    await Hive.box<Map>(_identityBox).clear();
+  }
+
+  Map<String, dynamic>? loadIdentity() {
+    final box = Hive.box<Map>(_identityBox);
+    final data = box.get('device');
+    if (data == null) {
+      return null;
+    }
+    return Map<String, dynamic>.from(data);
+  }
+
+  Future<void> persistIdentity(Map<String, dynamic> identity) async {
+    final box = Hive.box<Map>(_identityBox);
+    await box.put('device', identity);
   }
 }

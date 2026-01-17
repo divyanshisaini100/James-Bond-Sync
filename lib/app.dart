@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'app_state.dart';
 import 'models/clipboard_item.dart';
 import 'models/paired_device.dart';
+import 'models/pair_request.dart';
 
 class AppRoot extends StatefulWidget {
   const AppRoot({super.key});
@@ -113,7 +114,7 @@ class HomeScreen extends StatelessWidget {
             ...pending.map((request) => _PairRequestTile(
                   deviceName: request.deviceName,
                   deviceId: request.deviceId,
-                  onApprove: () => state.approvePairRequest(request),
+                  onApprove: () => _approvePair(context, state, request),
                   onReject: () => state.rejectPairRequest(request.deviceId),
                 )),
             const SizedBox(height: 16),
@@ -203,10 +204,67 @@ class HomeScreen extends StatelessWidget {
     if (result == true) {
       final name = nameController.text.trim();
       final id = idController.text.trim();
-      if (name.isNotEmpty && id.isNotEmpty) {
-        state.addPairedDevice(id, name);
-        state.signalingClient.requestPair(id);
+      if (name.isEmpty || id.isEmpty) {
+        return;
       }
+      final code = await state.addPairedDevice(id, name);
+      if (!context.mounted) {
+        return;
+      }
+      await showDialog<void>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('Pairing Code'),
+            content: SelectableText(
+              'Share this 6-digit code with the other device to approve pairing:\n\n$code',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Done'),
+              ),
+            ],
+          );
+        },
+      );
+    }
+  }
+
+  Future<void> _approvePair(BuildContext context, AppState state, PairRequest request) async {
+    final controller = TextEditingController();
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Enter Pairing Code'),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: '6-digit code'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Approve'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (approved != true) {
+      return;
+    }
+    final ok = await state.approvePairRequest(request, controller.text.trim());
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pairing code does not match.')),
+      );
     }
   }
 }

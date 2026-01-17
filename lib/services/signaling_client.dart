@@ -4,8 +4,13 @@ import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 typedef PresenceHandler = void Function(String deviceId, bool isOnline);
-typedef PairRequestHandler = void Function(String fromDeviceId, String fromDeviceName);
-typedef PairAcceptHandler = void Function(String fromDeviceId);
+typedef PairRequestHandler = void Function(
+  String fromDeviceId,
+  String fromDeviceName,
+  String publicKey,
+  String codeHash,
+);
+typedef PairAcceptHandler = void Function(String fromDeviceId, String publicKey, String codeHash);
 typedef RtcOfferHandler = void Function(String fromDeviceId, String sdp);
 typedef RtcAnswerHandler = void Function(String fromDeviceId, String sdp);
 typedef RtcIceHandler = void Function(String fromDeviceId, Map<String, dynamic> candidate);
@@ -21,8 +26,8 @@ abstract class SignalingClient {
   Future<void> connect();
   Future<void> disconnect();
 
-  Future<void> requestPair(String toDeviceId);
-  Future<void> acceptPair(String toDeviceId);
+  Future<void> requestPair(String toDeviceId, String publicKey, String codeHash);
+  Future<void> acceptPair(String toDeviceId, String publicKey, String codeHash);
   Future<void> sendOffer(String toDeviceId, String sdp);
   Future<void> sendAnswer(String toDeviceId, String sdp);
   Future<void> sendIceCandidate(String toDeviceId, Map<String, dynamic> candidate);
@@ -98,21 +103,25 @@ class WebSocketSignalingClient implements SignalingClient {
   }
 
   @override
-  Future<void> requestPair(String toDeviceId) async {
+  Future<void> requestPair(String toDeviceId, String publicKey, String codeHash) async {
     _sendMessage({
       'type': 'pair_request',
       'fromDeviceId': deviceId,
       'fromDeviceName': deviceName,
       'toDeviceId': toDeviceId,
+      'publicKey': publicKey,
+      'codeHash': codeHash,
     });
   }
 
   @override
-  Future<void> acceptPair(String toDeviceId) async {
+  Future<void> acceptPair(String toDeviceId, String publicKey, String codeHash) async {
     _sendMessage({
       'type': 'pair_accept',
       'fromDeviceId': deviceId,
       'toDeviceId': toDeviceId,
+      'publicKey': publicKey,
+      'codeHash': codeHash,
     });
   }
 
@@ -160,10 +169,16 @@ class WebSocketSignalingClient implements SignalingClient {
         _pairRequestHandler?.call(
           message['fromDeviceId'] as String,
           message['fromDeviceName'] as String? ?? 'Unknown',
+          message['publicKey'] as String,
+          message['codeHash'] as String,
         );
         break;
       case 'pair_accept':
-        _pairAcceptHandler?.call(message['fromDeviceId'] as String);
+        _pairAcceptHandler?.call(
+          message['fromDeviceId'] as String,
+          message['publicKey'] as String,
+          message['codeHash'] as String,
+        );
         break;
       case 'webrtc_offer':
         _offerHandler?.call(message['fromDeviceId'] as String, message['sdp'] as String);
@@ -235,10 +250,10 @@ class StubSignalingClient implements SignalingClient {
   Future<void> disconnect() async {}
 
   @override
-  Future<void> requestPair(String toDeviceId) async {}
+  Future<void> requestPair(String toDeviceId, String publicKey, String codeHash) async {}
 
   @override
-  Future<void> acceptPair(String toDeviceId) async {}
+  Future<void> acceptPair(String toDeviceId, String publicKey, String codeHash) async {}
 
   @override
   Future<void> sendOffer(String toDeviceId, String sdp) async {}
