@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 
+import '../models/clipboard_binary_payload.dart';
 import '../models/clipboard_item.dart';
 import 'clipboard_service.dart';
 import 'history_store.dart';
@@ -38,7 +39,10 @@ class SyncEngine {
   static const int maxBinaryBytes = 10 * 1024 * 1024;
 
   Future<void> start() async {
-    _clipboardService.startMonitoring(_handleLocalClipboardChange);
+    _clipboardService.startMonitoring(
+      onText: _handleLocalClipboardChange,
+      onBinary: _handleLocalBinaryChange,
+    );
     _p2pClient.setOnIncoming(_handleIncomingClipboardItem);
     _signalingClient.setOnPresence(_handlePresence);
     await _signalingClient.connect();
@@ -73,6 +77,25 @@ class SyncEngine {
       text: text,
       hash: _hashText(text),
       sizeBytes: sizeBytes,
+    );
+    sendItem(item);
+  }
+
+  void _handleLocalBinaryChange(ClipboardBinaryPayload payload) {
+    final timestampMs = DateTime.now().millisecondsSinceEpoch;
+    final id = '${localDeviceId}_$timestampMs_${_randSuffix()}';
+    final base64Payload = base64Encode(payload.bytes);
+    final item = ClipboardItem(
+      id: id,
+      deviceId: localDeviceId,
+      timestampMs: timestampMs,
+      dataType: payload.dataType,
+      text: '',
+      hash: base64Payload.hashCode.toString(),
+      payloadBase64: base64Payload,
+      fileName: payload.fileName,
+      mimeType: payload.mimeType,
+      sizeBytes: payload.bytes.length,
     );
     sendItem(item);
   }
@@ -115,6 +138,10 @@ class SyncEngine {
     _historyStore.add(item);
     if (item.dataType == 'text' && item.text.isNotEmpty) {
       _clipboardService.setClipboardText(item.text, suppressNextRead: true);
+    } else if (item.dataType == 'image' && item.payloadBase64 != null) {
+      final bytes = base64Decode(item.payloadBase64!);
+      _clipboardService.setClipboardImage(bytes,
+          mimeType: item.mimeType, suppressNextRead: true);
     }
   }
 

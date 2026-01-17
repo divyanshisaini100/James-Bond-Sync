@@ -271,7 +271,7 @@ class HomeScreen extends StatelessWidget {
       bytes: bytes,
       dataType: isImage ? 'image' : 'file',
       fileName: file.name,
-      mimeType: file.extension,
+      mimeType: isImage ? _mimeFromExtension(file.extension) : null,
     );
     if (!ok && context.mounted) {
       final limitMb = (state.maxBinaryBytes / (1024 * 1024)).toStringAsFixed(0);
@@ -412,6 +412,28 @@ String _formatBytes(int bytes) {
     return '${(bytes / 1024).toStringAsFixed(1)} KB';
   }
   return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+}
+
+String? _mimeFromExtension(String? extension) {
+  final ext = extension?.toLowerCase();
+  switch (ext) {
+    case 'png':
+      return 'image/png';
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'gif':
+      return 'image/gif';
+    case 'webp':
+      return 'image/webp';
+    case 'bmp':
+      return 'image/bmp';
+    case 'tif':
+    case 'tiff':
+      return 'image/tiff';
+    default:
+      return null;
+  }
 }
 
 class _PairRequestTile extends StatelessWidget {
