@@ -25,12 +25,22 @@ class ClipboardService {
   }) {
     _pollTimer?.cancel();
     _pollTimer = Timer.periodic(const Duration(milliseconds: 800), (_) async {
+      if (kIsWeb) {
+        await _readFallbackText(onText);
+        return;
+      }
       final systemClipboard = SystemClipboard.instance;
       if (systemClipboard == null) {
         await _readFallbackText(onText);
         return;
       }
-      final reader = await systemClipboard.read();
+    ClipboardReader reader;
+    try {
+      reader = await systemClipboard.read();
+    } catch (_) {
+      await _readFallbackText(onText);
+      return;
+    }
       final imagePayload = await _readImage(reader);
       if (imagePayload != null) {
         _handleBinary(imagePayload, onBinary);
@@ -136,7 +146,7 @@ class ClipboardService {
   }
 
   Future<ClipboardBinaryPayload?> _readFile(ClipboardReader reader) async {
-    if (kIsWeb) {
+    if (kIsWeb || !(Platform.isMacOS || Platform.isWindows || Platform.isLinux)) {
       return null;
     }
     final uri = await reader.readValue(Formats.fileUri);
