@@ -16,4 +16,3 @@ Privacy & Security
 🔐 End-to-End Encryption - WebRTC DTLS-SRTP encryption
 🚫 No Tracking - No analytics, no data collection
 🏠 Self-Hosted Option - Run your own signaling server
-Random line added.
