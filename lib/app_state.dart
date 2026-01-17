@@ -25,6 +25,7 @@ class AppState extends ChangeNotifier {
     p2pClient = WebRtcP2PClient(
       localDeviceId: _deviceId,
       signalingClient: signalingClient,
+      rtcConfig: _buildRtcConfig(),
     );
     _syncEngine = SyncEngine(
       localDeviceId: localDeviceId,
@@ -43,6 +44,9 @@ class AppState extends ChangeNotifier {
   static final String _deviceId = 'device-${DateTime.now().millisecondsSinceEpoch}';
   static const String _signalingUrl =
       String.fromEnvironment('SIGNALING_URL', defaultValue: 'ws://localhost:8080');
+  static const String _turnUrlsEnv = String.fromEnvironment('TURN_URLS');
+  static const String _turnUsername = String.fromEnvironment('TURN_USERNAME');
+  static const String _turnCredential = String.fromEnvironment('TURN_CREDENTIAL');
   final String localDeviceId = _deviceId;
   final HistoryStore historyStore;
   final PairingManager pairingManager;
@@ -126,6 +130,23 @@ class AppState extends ChangeNotifier {
     signalingClient.setOnIce((fromDeviceId, candidate) {
       rtcClient?.handleIce(fromDeviceId, candidate);
     });
+  }
+
+  Map<String, dynamic> _buildRtcConfig() {
+    final iceServers = <Map<String, dynamic>>[
+      {'urls': 'stun:stun.l.google.com:19302'},
+    ];
+    if (_turnUrlsEnv.isNotEmpty) {
+      final urls = _turnUrlsEnv.split(',').map((u) => u.trim()).where((u) => u.isNotEmpty).toList();
+      if (urls.isNotEmpty) {
+        iceServers.add({
+          'urls': urls,
+          'username': _turnUsername,
+          'credential': _turnCredential,
+        });
+      }
+    }
+    return {'iceServers': iceServers};
   }
 
   @override

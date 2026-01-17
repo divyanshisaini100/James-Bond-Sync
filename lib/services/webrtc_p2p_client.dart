@@ -11,18 +11,21 @@ class WebRtcP2PClient implements P2PClient {
   WebRtcP2PClient({
     required this.localDeviceId,
     required SignalingClient signalingClient,
-  }) : _signalingClient = signalingClient;
+    Map<String, dynamic>? rtcConfig,
+  })  : _signalingClient = signalingClient,
+        _rtcConfig = rtcConfig ??
+            <String, dynamic>{
+              'iceServers': [
+                {'urls': 'stun:stun.l.google.com:19302'},
+              ],
+            };
 
   final String localDeviceId;
   final SignalingClient _signalingClient;
   final Map<String, _PeerSession> _sessions = <String, _PeerSession>{};
   ClipboardItemHandler? _incomingHandler;
 
-  final Map<String, dynamic> _rtcConfig = {
-    'iceServers': [
-      {'urls': 'stun:stun.l.google.com:19302'},
-    ],
-  };
+  final Map<String, dynamic> _rtcConfig;
 
   @override
   void setOnIncoming(ClipboardItemHandler handler) {
