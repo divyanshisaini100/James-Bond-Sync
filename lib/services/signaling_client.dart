@@ -86,6 +86,9 @@ class WebSocketSignalingClient implements SignalingClient {
 
   @override
   Future<void> connect() async {
+    if (_channel != null) {
+      return;
+    }
     _channel = WebSocketChannel.connect(Uri.parse(url));
     _subscription = _channel!.stream.listen(_handleMessage);
     _sendMessage({

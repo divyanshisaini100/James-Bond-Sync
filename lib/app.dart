@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import 'services/background_task_service.dart';
+
 import 'app_state.dart';
 import 'models/clipboard_item.dart';
 import 'models/paired_device.dart';
@@ -17,12 +19,21 @@ class AppRoot extends StatefulWidget {
 
 class _AppRootState extends State<AppRoot> {
   late final AppState _appState;
+  late final BackgroundTaskService _backgroundTaskService;
 
   @override
   void initState() {
     super.initState();
     _appState = AppState();
-    _appState.initialize().then((_) => _appState.start());
+    _backgroundTaskService = BackgroundTaskService();
+    _appState.initialize().then((_) async {
+      await _backgroundTaskService.configure(onFetch: () async {
+        if (_appState.isSyncEnabled) {
+          await _appState.start();
+        }
+      });
+      await _appState.start();
+    });
   }
 
   @override
