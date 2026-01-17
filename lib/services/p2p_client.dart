@@ -4,6 +4,7 @@ typedef ClipboardItemHandler = void Function(ClipboardItem item, String fromDevi
 
 abstract class P2PClient {
   void setOnIncoming(ClipboardItemHandler handler);
+  Future<void> connectToDevice(String deviceId);
   Future<void> sendToDevice(String deviceId, ClipboardItem item);
   Future<void> broadcast(Iterable<String> deviceIds, ClipboardItem item);
   void dispose();
@@ -15,6 +16,11 @@ class StubP2PClient implements P2PClient {
   @override
   void setOnIncoming(ClipboardItemHandler handler) {
     _handler = handler;
+  }
+
+  @override
+  Future<void> connectToDevice(String deviceId) async {
+    // Placeholder for WebRTC session initialization.
   }
 
   @override

@@ -1,0 +1,13 @@
+{
+  "name": "james-bond-sync-signaling",
+  "version": "0.1.0",
+  "private": true,
+  "description": "WebSocket signaling server for Universal Clipboard Sync",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.17.0"
+  }
+}

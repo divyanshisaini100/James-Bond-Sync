@@ -51,6 +51,7 @@ class SyncEngine {
   void _handlePresence(String deviceId, bool isOnline) {
     _pairingManager.updatePresence(deviceId, isOnline);
     if (isOnline) {
+      _p2pClient.connectToDevice(deviceId);
       final queued = _offlineQueue.drainForDevice(deviceId);
       for (final item in queued) {
         _p2pClient.sendToDevice(deviceId, item);

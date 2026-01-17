@@ -147,6 +147,7 @@ class HomeScreen extends StatelessWidget {
       final id = idController.text.trim();
       if (name.isNotEmpty && id.isNotEmpty) {
         state.addPairedDevice(id, name);
+        state.signalingClient.requestPair(id);
       }
     }
   }
