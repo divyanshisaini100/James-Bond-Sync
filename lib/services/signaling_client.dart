@@ -46,6 +46,9 @@ class WebSocketSignalingClient implements SignalingClient {
 
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _subscription;
+  bool _isConnecting = false;
+  bool _shouldReconnect = true;
+  int _reconnectAttempts = 0;
 
   PresenceHandler? _presenceHandler;
   PairRequestHandler? _pairRequestHandler;
@@ -86,20 +89,29 @@ class WebSocketSignalingClient implements SignalingClient {
 
   @override
   Future<void> connect() async {
-    if (_channel != null) {
+    if (_channel != null || _isConnecting) {
       return;
     }
+    _shouldReconnect = true;
+    _isConnecting = true;
     _channel = WebSocketChannel.connect(Uri.parse(url));
-    _subscription = _channel!.stream.listen(_handleMessage);
+    _subscription = _channel!.stream.listen(
+      _handleMessage,
+      onDone: _handleDisconnect,
+      onError: (_) => _handleDisconnect(),
+    );
     _sendMessage({
       'type': 'register',
       'deviceId': deviceId,
       'deviceName': deviceName,
     });
+    _isConnecting = false;
+    _reconnectAttempts = 0;
   }
 
   @override
   Future<void> disconnect() async {
+    _shouldReconnect = false;
     await _subscription?.cancel();
     await _channel?.sink.close();
     _channel = null;
@@ -205,6 +217,27 @@ class WebSocketSignalingClient implements SignalingClient {
       return;
     }
     channel.sink.add(jsonEncode(message));
+  }
+
+  void _handleDisconnect() {
+    _subscription?.cancel();
+    _subscription = null;
+    _channel = null;
+    if (!_shouldReconnect) {
+      return;
+    }
+    _scheduleReconnect();
+  }
+
+  void _scheduleReconnect() {
+    _reconnectAttempts += 1;
+    final delaySeconds = _reconnectAttempts.clamp(1, 6);
+    Future.delayed(Duration(seconds: delaySeconds), () {
+      if (_channel != null || _isConnecting) {
+        return;
+      }
+      connect();
+    });
   }
 }
 
