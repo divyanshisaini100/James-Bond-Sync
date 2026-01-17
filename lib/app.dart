@@ -9,6 +9,7 @@ import 'app_state.dart';
 import 'models/clipboard_item.dart';
 import 'models/paired_device.dart';
 import 'models/pair_request.dart';
+import 'services/monitoring_service.dart';
 
 class AppRoot extends StatefulWidget {
   const AppRoot({super.key});
@@ -103,6 +104,8 @@ class HomeScreen extends StatelessWidget {
                 state.toggleBackgroundSync(false);
               } else if (value == 'rotate_keys') {
                 _confirmRotateKeys(context, state);
+              } else if (value == 'diagnostics') {
+                _showDiagnostics(context, state.monitoringService);
               }
             },
             itemBuilder: (context) => const [
@@ -125,6 +128,10 @@ class HomeScreen extends StatelessWidget {
               PopupMenuItem(
                 value: 'rotate_keys',
                 child: Text('Rotate identity keys'),
+              ),
+              PopupMenuItem(
+                value: 'diagnostics',
+                child: Text('Diagnostics'),
               ),
             ],
           ),
@@ -266,6 +273,53 @@ class HomeScreen extends StatelessWidget {
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Done'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _showDiagnostics(
+    BuildContext context,
+    MonitoringService monitoringService,
+  ) async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Diagnostics'),
+          content: SizedBox(
+            width: 360,
+            height: 360,
+            child: AnimatedBuilder(
+              animation: monitoringService,
+              builder: (context, _) {
+                final entries = monitoringService.entries;
+                if (entries.isEmpty) {
+                  return const Text('No events yet.');
+                }
+                return ListView.builder(
+                  itemCount: entries.length,
+                  itemBuilder: (context, index) {
+                    final entry = entries[index];
+                    return Text(
+                      '${entry.timestamp.toIso8601String()} • ${entry.message}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => monitoringService.clear(),
+              child: const Text('Clear'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
             ),
           ],
         );

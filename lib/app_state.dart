@@ -14,6 +14,7 @@ import 'services/offline_queue.dart';
 import 'services/pairing_manager.dart';
 import 'services/p2p_client.dart';
 import 'services/identity_service.dart';
+import 'services/monitoring_service.dart';
 import 'services/storage_service.dart';
 import 'services/webrtc_p2p_client.dart';
 import 'services/signaling_client.dart';
@@ -27,6 +28,7 @@ class AppState extends ChangeNotifier {
     pairingManager = PairingManager(storageService: storageService);
     offlineQueue = OfflineQueue(storageService: storageService);
     backgroundSyncService = BackgroundSyncService();
+    monitoringService = MonitoringService();
     signalingClient = WebSocketSignalingClient(
       url: _signalingUrl,
       deviceId: _deviceId,
@@ -64,6 +66,7 @@ class AppState extends ChangeNotifier {
   late final PairingManager pairingManager;
   final ClipboardService clipboardService;
   late final BackgroundSyncService backgroundSyncService;
+  late final MonitoringService monitoringService;
   late final OfflineQueue offlineQueue;
   late final P2PClient p2pClient;
   late final SignalingClient signalingClient;
@@ -92,11 +95,13 @@ class AppState extends ChangeNotifier {
 
   Future<void> start() async {
     if (_isSyncEnabled) {
+      monitoringService.log('Sync started');
       await _syncEngine.start();
     }
   }
 
   Future<void> stop() async {
+    monitoringService.log('Sync stopped');
     await _syncEngine.stop();
   }
 
@@ -114,8 +119,10 @@ class AppState extends ChangeNotifier {
     _isBackgroundSyncEnabled = enabled;
     if (enabled) {
       await backgroundSyncService.enable();
+      monitoringService.log('Background sync enabled');
     } else {
       await backgroundSyncService.disable();
+      monitoringService.log('Background sync disabled');
     }
     notifyListeners();
   }
@@ -126,6 +133,7 @@ class AppState extends ChangeNotifier {
     _pendingOutgoing.add(
       PendingPairOutgoing(deviceId: id, deviceName: name, codeHash: codeHash),
     );
+    monitoringService.log('Pairing request sent to $name');
     await signalingClient.requestPair(id, identityService.publicKeyBase64, codeHash);
     return code;
   }
@@ -162,11 +170,13 @@ class AppState extends ChangeNotifier {
 
   void removePairedDevice(String id) {
     pairingManager.removeDevice(id);
+    monitoringService.log('Device removed: $id');
   }
 
   Future<void> rotateKeys() async {
     await identityService.rotateKeys();
     _localPublicKey = identityService.publicKeyBase64;
+    monitoringService.log('Identity keys rotated');
     notifyListeners();
   }
 
@@ -181,12 +191,14 @@ class AppState extends ChangeNotifier {
     }
     await storageService.clearAll();
     await offlineQueue.loadFromStorage();
+    monitoringService.log('Storage cleared');
     notifyListeners();
   }
 
   Future<bool> approvePairRequest(PairRequest request, String code) async {
     final codeHash = await identityService.hashPairCode(code);
     if (codeHash != request.codeHash) {
+      monitoringService.log('Pairing failed for ${request.deviceName}: code mismatch');
       return false;
     }
     _pendingPairRequests.removeWhere((r) => r.deviceId == request.deviceId);
@@ -206,12 +218,14 @@ class AppState extends ChangeNotifier {
     if (p2pClient is WebRtcP2PClient) {
       (p2pClient as WebRtcP2PClient).connectToDevice(request.deviceId);
     }
+    monitoringService.log('Pairing approved with ${request.deviceName}');
     notifyListeners();
     return true;
   }
 
   void rejectPairRequest(String deviceId) {
     _pendingPairRequests.removeWhere((r) => r.deviceId == deviceId);
+    monitoringService.log('Pairing rejected: $deviceId');
     notifyListeners();
   }
 
