@@ -76,6 +76,25 @@ class HomeScreen extends StatelessWidget {
               ),
             ],
           ),
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'clear_history') {
+                state.clearHistory();
+              } else if (value == 'reset_storage') {
+                _confirmReset(context, state);
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: 'clear_history',
+                child: Text('Clear history'),
+              ),
+              PopupMenuItem(
+                value: 'reset_storage',
+                child: Text('Forget devices & reset'),
+              ),
+            ],
+          ),
         ],
       ),
       body: ListView(
@@ -115,6 +134,33 @@ class HomeScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _confirmReset(BuildContext context, AppState state) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Reset Storage'),
+          content: const Text(
+              'This clears history, paired devices, and pending queues. Continue?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Reset'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result == true) {
+      state.clearAllStorage();
+    }
   }
 
   Future<void> _showPairDialog(BuildContext context) async {

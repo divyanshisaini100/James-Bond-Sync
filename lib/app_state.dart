@@ -99,6 +99,20 @@ class AppState extends ChangeNotifier {
     pairingManager.removeDevice(id);
   }
 
+  void clearHistory() {
+    historyStore.clear();
+  }
+
+  void clearAllStorage() async {
+    historyStore.clear();
+    for (final device in List<PairedDevice>.from(pairingManager.devices)) {
+      pairingManager.removeDevice(device.id);
+    }
+    await storageService.clearAll();
+    await offlineQueue.loadFromStorage();
+    notifyListeners();
+  }
+
   void approvePairRequest(PairRequest request) {
     _pendingPairRequests.removeWhere((r) => r.deviceId == request.deviceId);
     pairingManager.addDevice(PairedDevice(id: request.deviceId, name: request.deviceName));

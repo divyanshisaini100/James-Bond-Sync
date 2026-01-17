@@ -88,4 +88,10 @@ class StorageService {
     final box = Hive.box<Map>(_offlineQueueBox);
     await box.delete(deviceId);
   }
+
+  Future<void> clearAll() async {
+    await Hive.box<Map>(_historyBox).clear();
+    await Hive.box<Map>(_pairedDevicesBox).clear();
+    await Hive.box<Map>(_offlineQueueBox).clear();
+  }
 }
