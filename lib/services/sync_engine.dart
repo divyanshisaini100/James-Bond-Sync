@@ -34,6 +34,8 @@ class SyncEngine {
   final SignalingClient _signalingClient;
 
   int _lastAppliedTimestamp = 0;
+  static const int maxTextBytes = 64 * 1024;
+  static const int maxBinaryBytes = 10 * 1024 * 1024;
 
   Future<void> start() async {
     _clipboardService.startMonitoring(_handleLocalClipboardChange);
@@ -62,6 +64,7 @@ class SyncEngine {
   void _handleLocalClipboardChange(String text) {
     final timestampMs = DateTime.now().millisecondsSinceEpoch;
     final id = '${localDeviceId}_$timestampMs_${_randSuffix()}';
+    final sizeBytes = utf8.encode(text).length;
     final item = ClipboardItem(
       id: id,
       deviceId: localDeviceId,
@@ -69,12 +72,16 @@ class SyncEngine {
       dataType: 'text',
       text: text,
       hash: _hashText(text),
+      sizeBytes: sizeBytes,
     );
-    _applyAndBroadcast(item);
+    sendItem(item);
   }
 
   void _handleIncomingClipboardItem(ClipboardItem item, String fromDeviceId) {
     if (_historyStore.containsId(item.id)) {
+      return;
+    }
+    if (_isOversize(item)) {
       return;
     }
     if (item.timestampMs < _lastAppliedTimestamp) {
@@ -83,9 +90,11 @@ class SyncEngine {
     _applyRemoteItem(item);
   }
 
-  void _applyAndBroadcast(ClipboardItem item) {
+  bool sendItem(ClipboardItem item) {
+    if (_isOversize(item)) {
+      return false;
+    }
     _applyLocalItem(item);
-    final deviceIds = _pairingManager.devices.map((d) => d.id);
     for (final device in _pairingManager.devices) {
       if (device.isOnline) {
         _p2pClient.sendToDevice(device.id, item);
@@ -93,6 +102,7 @@ class SyncEngine {
         _offlineQueue.enqueue(device.id, item);
       }
     }
+    return true;
   }
 
   void _applyLocalItem(ClipboardItem item) {
@@ -103,7 +113,9 @@ class SyncEngine {
   void _applyRemoteItem(ClipboardItem item) {
     _lastAppliedTimestamp = max(_lastAppliedTimestamp, item.timestampMs);
     _historyStore.add(item);
-    _clipboardService.setClipboardText(item.text, suppressNextRead: true);
+    if (item.dataType == 'text' && item.text.isNotEmpty) {
+      _clipboardService.setClipboardText(item.text, suppressNextRead: true);
+    }
   }
 
   String _hashText(String text) {
@@ -119,5 +131,13 @@ class SyncEngine {
     const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
     final rand = Random();
     return List<String>.generate(4, (_) => alphabet[rand.nextInt(alphabet.length)]).join();
+  }
+
+  bool _isOversize(ClipboardItem item) {
+    final sizeBytes = item.sizeBytes ?? utf8.encode(item.text).length;
+    if (item.dataType == 'text') {
+      return sizeBytes > maxTextBytes;
+    }
+    return sizeBytes > maxBinaryBytes;
   }
 }

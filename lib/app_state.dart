@@ -1,5 +1,9 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart';
 
+import 'models/clipboard_item.dart';
 import 'models/paired_device.dart';
 import 'models/pair_request.dart';
 import 'models/pending_pair_outgoing.dart';
@@ -68,6 +72,7 @@ class AppState extends ChangeNotifier {
 
   bool get isSyncEnabled => _isSyncEnabled;
   List<PairRequest> get pendingPairRequests => List.unmodifiable(_pendingPairRequests);
+  int get maxBinaryBytes => SyncEngine.maxBinaryBytes;
 
   Future<void> initialize() async {
     await storageService.init();
@@ -105,6 +110,30 @@ class AppState extends ChangeNotifier {
     );
     await signalingClient.requestPair(id, identityService.publicKeyBase64, codeHash);
     return code;
+  }
+
+  bool sendBinaryItem({
+    required Uint8List bytes,
+    required String dataType,
+    String? fileName,
+    String? mimeType,
+  }) {
+    final timestampMs = DateTime.now().millisecondsSinceEpoch;
+    final id = '${localDeviceId}_$timestampMs_${_generatePairCode()}';
+    final base64Payload = base64Encode(bytes);
+    final item = ClipboardItem(
+      id: id,
+      deviceId: localDeviceId,
+      timestampMs: timestampMs,
+      dataType: dataType,
+      text: '',
+      hash: base64Payload.hashCode.toString(),
+      payloadBase64: base64Payload,
+      fileName: fileName,
+      mimeType: mimeType,
+      sizeBytes: bytes.length,
+    );
+    return _syncEngine.sendItem(item);
   }
 
   String _generatePairCode() {

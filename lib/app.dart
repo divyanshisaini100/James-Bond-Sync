@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import 'app_state.dart';
@@ -107,6 +110,22 @@ class HomeScreen extends StatelessWidget {
               onPressed: () => _showPairDialog(context),
               child: const Text('Add'),
             ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 12,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => _pickAndSendFile(context, state, isImage: true),
+                icon: const Icon(Icons.image),
+                label: const Text('Send Image'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _pickAndSendFile(context, state, isImage: false),
+                icon: const Icon(Icons.attach_file),
+                label: const Text('Send File'),
+              ),
+            ],
           ),
           if (pending.isNotEmpty) ...[
             const SizedBox(height: 8),
@@ -231,6 +250,37 @@ class HomeScreen extends StatelessWidget {
     }
   }
 
+  Future<void> _pickAndSendFile(
+    BuildContext context,
+    AppState state, {
+    required bool isImage,
+  }) async {
+    final result = await FilePicker.platform.pickFiles(
+      withData: true,
+      type: isImage ? FileType.image : FileType.any,
+    );
+    if (result == null || result.files.isEmpty) {
+      return;
+    }
+    final file = result.files.single;
+    final bytes = file.bytes;
+    if (bytes == null) {
+      return;
+    }
+    final ok = state.sendBinaryItem(
+      bytes: bytes,
+      dataType: isImage ? 'image' : 'file',
+      fileName: file.name,
+      mimeType: file.extension,
+    );
+    if (!ok && context.mounted) {
+      final limitMb = (state.maxBinaryBytes / (1024 * 1024)).toStringAsFixed(0);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('File too large. Max $limitMb MB.')),
+      );
+    }
+  }
+
   Future<void> _approvePair(BuildContext context, AppState state, PairRequest request) async {
     final controller = TextEditingController();
     final approved = await showDialog<bool>(
@@ -323,6 +373,25 @@ class _HistoryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
+    if (item.dataType == 'image' && item.payloadBase64 != null) {
+      final bytes = base64Decode(item.payloadBase64!);
+      return Card(
+        child: ListTile(
+          leading: Image.memory(bytes, width: 48, height: 48, fit: BoxFit.cover),
+          title: Text(item.fileName ?? 'Image'),
+          subtitle: Text('${_formatBytes(item.sizeBytes ?? bytes.length)} • ${item.deviceId}'),
+        ),
+      );
+    }
+    if (item.dataType == 'file' && item.payloadBase64 != null) {
+      return Card(
+        child: ListTile(
+          leading: const Icon(Icons.insert_drive_file),
+          title: Text(item.fileName ?? 'File'),
+          subtitle: Text('${_formatBytes(item.sizeBytes ?? 0)} • ${item.deviceId}'),
+        ),
+      );
+    }
     final preview = item.text.length > 64 ? '${item.text.substring(0, 64)}...' : item.text;
 
     return Card(
@@ -333,6 +402,16 @@ class _HistoryTile extends StatelessWidget {
       ),
     );
   }
+}
+
+String _formatBytes(int bytes) {
+  if (bytes < 1024) {
+    return '$bytes B';
+  }
+  if (bytes < 1024 * 1024) {
+    return '${(bytes / 1024).toStringAsFixed(1)} KB';
+  }
+  return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
 }
 
 class _PairRequestTile extends StatelessWidget {
